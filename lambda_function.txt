@@ -1,0 +1,184 @@
+#!/usr/bin/env python3
+
+import os
+import json
+import sys
+from ctypes import *
+import boto3
+import zipfile
+import time
+import shutil
+import glob
+
+#m4 macro gets expanded...
+deployment="__DEPLOYMENT__"
+
+bucketname='perrystreet.net'
+deploy='lib/deploy/{}'.format(deployment)
+
+load='{}/lib/load/'.format(deploy)
+prepreload='{}/lib/prepreload/'.format(deploy)
+preload='{}/lib/preload/'.format(deploy)
+zipload='{}/lib/zip/'.format(deploy)
+otherload='{}/lib/other/'.format(deploy)
+numpyload='{}/lib/numpy/'.format(deploy)
+pandasload='{}/lib/pandas/'.format(deploy)
+scipyload='{}/lib/scipy_other/'.format(deploy)
+pyarrowload='{}/lib/pyarrow/'.format(deploy)
+
+s3_paginator = boto3.client('s3').get_paginator('list_objects_v2')
+s3=boto3.resource('s3')
+
+def keys(bucket_name, prefix='/', delimiter='/', start_after=''):
+    prefix = prefix[1:] if prefix.startswith(delimiter) else prefix
+    start_after = (start_after or prefix) if prefix.endswith(delimiter) else start_after
+    for page in s3_paginator.paginate(Bucket=bucket_name, Prefix=prefix, StartAfter=start_after):
+        for content in page.get('Contents', ()):
+            yield content['Key']
+
+
+def loadlib(folder):
+   for k in keys(bucketname,folder):
+      print(k)
+      print(os.path.basename(k))
+      localfile='/tmp/{}'.format(os.path.basename(k))
+      s3.Bucket(bucketname).download_file(k,localfile)
+      print(os.listdir("/tmp"))
+      if os.path.exists(localfile):
+         cdll.LoadLibrary(localfile)
+         #os.system('/bin/rm -f {}'.format(localfile))
+         #os.remove(localfile) NOTE this does'nt do anything
+         pass
+      else:
+         print('{} not found!'.format(localfile))
+
+def loadzip_to_tmp(folder,outfolder):
+   for k in keys(bucketname,folder):
+      print(k)
+      print(os.path.basename(k))
+      localfile='/tmp/{}'.format(os.path.basename(k))
+      s3.Bucket(bucketname).download_file(k,localfile)
+      with zipfile.ZipFile(localfile,'r') as zip_ref:
+         zip_ref.extractall('/tmp/{}/'.format(outfolder))
+      if os.path.exists(localfile):
+         os.remove(localfile)
+
+def loadzipfile_to_tmp(k,outfolder):
+   print(k)
+   print(os.path.basename(k))
+   localfile='/tmp/{}'.format(os.path.basename(k))
+   s3.Bucket(bucketname).download_file(k,localfile)
+   with zipfile.ZipFile(localfile,'r') as zip_ref:
+      zip_ref.extractall('/tmp/{}/'.format(outfolder))
+   if os.path.exists(localfile):
+      os.remove(localfile)
+
+
+def purge_dir(folder):
+   for filename in os.listdir(folder):
+      file_path = os.path.join(folder, filename)
+      try:
+         if os.path.isfile(file_path) or os.path.islink(file_path):
+            os.unlink(file_path)
+         elif os.path.isdir(file_path):
+            shutil.rmtree(file_path)
+      except Exception as e:
+         print('Failed to delete %s. Reason: %s' % (file_path, e))
+   
+
+def purge(folder):
+   files = glob.glob('/tmp/*')
+   for f in files:
+       os.remove(f)
+       #cmd='/bin/rm -rf {}'.format(f)
+       #print(cmd)
+       #os.system(cmd)
+
+def newpurge(folder):
+    for filename in os.listdir(folder):
+        file_path = os.path.join(folder, filename)
+        try:
+            if os.path.isfile(file_path) or os.path.islink(file_path):
+                os.unlink(file_path)
+            elif os.path.isdir(file_path):
+                shutil.rmtree(file_path)
+        except Exception as e:
+            print('Failed to delete %s. Reason: %s' % (file_path, e))
+
+
+newpurge("/tmp")
+print("After initial purge ----------")
+print(os.listdir("/tmp"))
+print(os.system("/bin/df"))
+
+#print(os.system("/bin/rm -f /tmp/tf-20210121.zip"))
+#print(os.system("/bin/rm -rf /tmp/tf-extracted"))
+
+loadlib(prepreload)
+#print("After preload ----------")
+#print(os.system("/bin/df"))
+loadlib(preload)
+print("After preload ----------")
+print(os.system("/bin/df"))
+loadlib(load)
+#newpurge("/tmp")
+print("After load ----------")
+print(os.system("/bin/df"))
+loadlib(numpyload)
+#newpurge("/tmp")
+print("After numpy purge ----------")
+print(os.system("/bin/df"))
+loadlib(otherload)
+loadlib(pandasload)
+loadlib(scipyload)
+loadlib(pyarrowload)
+
+#newpurge("/tmp")
+print("After otherload purge ----------")
+print(os.listdir("/tmp"))
+print(os.system("/bin/sync"))
+print(os.system("/bin/df"))
+
+#loadzipfile_to_tmp('lib/zip/tf-20210121.zip','tf-extracted')
+
+#loadzip_to_tmp(deploy,'sp-extracted')
+#loadzip_to_tmp(zipload,'tf-extracted')
+
+
+
+#sys.path.append('/tmp/sp-extracted')
+#sys.path.append('/tmp/tf-extracted')
+
+print(os.listdir("/tmp"))
+
+import sklearn.exceptions
+import sklearn.metrics._classification
+from sklearn import decomposition
+import numpy as np
+import tensorflow as tf
+import tensorflow_addons as tfa
+
+import pyarrow.parquet as papq
+import pkg_resources
+import chardet.universaldetector
+import fastavro
+
+import pandas as pd
+
+
+import scipy as sp
+
+def lambda_handler(event, context):
+   print(os.listdir("/tmp"))
+   print(os.system("/bin/df"))
+
+
+   arr = np.array([1, 2, 3, 4, 5])
+
+   print(arr)
+
+   return {
+      'statusCode':200,
+      'body':json.dumps("Howdy from Lambda!")
+   }
+
